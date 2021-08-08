@@ -2,9 +2,7 @@
 
 namespace Laraning\NovaTimeField;
 
-use Carbon\Carbon;
-use DateTime;
-use Exception;
+use Illuminate\Support\Carbon;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
@@ -20,32 +18,34 @@ class TimeField extends Field
     /**
      * Create a new field.
      *
-     * @param string      $name
+     * @param string $name
      * @param string|null $attribute
-     * @param mixed|null  $resolveCallback
+     * @param mixed|null $resolveCallback
      *
      * @return void
      */
     public function __construct($name, $attribute = null, $resolveCallback = null)
     {
         parent::__construct($name, $attribute, $resolveCallback ?? function ($value) use ($attribute) {
-            if (!is_null($value)) {
+                if ($value === null) {
+                    return null;
+                }
+
                 // Convert the value string into a Carbon date/time object.
-                $value = Carbon::createFromFormat('H:i:s', $value)->format($this->format());
+                $value = Carbon::parse($value)->format($this->format());
 
                 if (!$value) {
-                    throw new Exception('Field '.($attribute ?? '').' must contain a valid time value.');
+                    throw new \Exception('Field ' . ($attribute ?? '') . ' must contain a valid time value.');
                 }
 
                 return $value;
-            }
-        });
+            });
     }
 
     /**
      * Validates if the 12h format value is a 12h format.
      *
-     * @return bool
+     * @return string
      */
     public function format()
     {
@@ -55,11 +55,11 @@ class TimeField extends Field
     /**
      * Defines the minute increment step.
      *
-     * @param type $step
+     * @param int $step
      *
-     * @return void
+     * @return $this
      */
-    public function minuteIncrement($step)
+    public function minuteIncrement(int $step)
     {
         return $this->withMeta(['minuteIncrement' => $step]);
     }
@@ -67,7 +67,7 @@ class TimeField extends Field
     /**
      * Applies 12h format in the field.
      *
-     * @return void
+     * @return $this
      */
     public function withTwelveHourTime()
     {
@@ -75,15 +75,15 @@ class TimeField extends Field
     }
 
     /**
-     * @param null|string $adjustment The adjustment to be applied to the date from the database.
+     * @param int|null $adjustment The adjustment to be applied to the date from the database.
      *
-     * @return TimeField
+     * @return $this
      */
-    public function withTimezoneAdjustments(int $adjustment)
+    public function withTimezoneAdjustments(int $adjustment = null)
     {
         return $this->withMeta([
             'timezoneAdjustments' => true,
-            'timezoneAdjustment'  => $adjustment,
+            'timezoneAdjustment' => $adjustment,
         ]);
     }
 
@@ -91,11 +91,11 @@ class TimeField extends Field
      * Hydrate the given attribute on the model based on the incoming request.
      *
      * @param \Laravel\Nova\Http\Requests\NovaRequest $request
-     * @param string                                  $requestAttribute
-     * @param object                                  $model
-     * @param string                                  $attribute
+     * @param string $requestAttribute
+     * @param object $model
+     * @param string $attribute
      *
-     * @return mixed
+     * @return void
      */
     protected function fillAttributeFromRequest(NovaRequest $request, $requestAttribute, $model, $attribute)
     {
@@ -127,19 +127,24 @@ class TimeField extends Field
      *
      * @param string $timeString
      *
-     * @return mixed
+     * @return string|bool
      */
-    protected function validatedTimeFormat($timeString)
+    protected function validatedTimeFormat(string $timeString)
     {
         $allowedFormats = [
             'H:i',
             'H:i:s',
+            'H:i:s.v',
+            'H:i:s.u',
             $this->format(),
         ];
 
         foreach ($allowedFormats as $format) {
-            if (DateTime::createFromFormat($format, $timeString) !== false) {
-                return $format;
+            try {
+                if (Carbon::createFromFormat($format, $timeString) !== false) {
+                    return $format;
+                }
+            } catch (\InvalidArgumentException) {
             }
         }
 
